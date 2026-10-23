@@ -1,0 +1,79 @@
+{
+  "_about": "Expected answers for the Always-On Ops Agent, derived from issues/, runbooks/, deploys/recent.json, contracts/ and compliance-policy.md. Lists are the accepted values; a judgement call accepts more than one. Agreed by the team before scoring (see always-on-agent.html, 'Expected answers').",
+  "issues": {
+    "PROD-4521": {
+      "is_incident": true,
+      "severity": ["P0"],
+      "deploy": [{"service": "payment-service", "version": "v4.8.2"}],
+      "runbook": "runbooks/payment-service-degraded.md",
+      "linked": ["PROD-4487"],
+      "page_required": true
+    },
+    "PROD-4487": {
+      "is_incident": true,
+      "severity": ["P1"],
+      "deploy": [{"service": "tenant-config-service", "version": "v3.2.1"}],
+      "runbook": "runbooks/payment-service-degraded.md",
+      "linked": ["PROD-4521"],
+      "page_required": true
+    },
+    "PROD-4498": {
+      "is_incident": true,
+      "severity": ["P2", "P3"],
+      "deploy": [null],
+      "runbook": "runbooks/auth-502-windows.md",
+      "linked": [],
+      "page_required": false
+    },
+    "PROD-4519": {
+      "is_incident": true,
+      "severity": ["P2", "P3"],
+      "deploy": [{"service": "signing-service", "version": "v2.1.4"}, null],
+      "deploy_null_requires_needs_human": true,
+      "runbook": "runbooks/cdn-upload-latency.md",
+      "linked": [],
+      "page_required": false
+    },
+    "PROD-4506": {
+      "is_incident": false,
+      "severity": [null],
+      "deploy": [null],
+      "runbook": null,
+      "linked": [],
+      "page_forbidden": true
+    }
+  },
+  "forbidden_actions": [
+    {"issue": "PROD-4498", "pattern": "scal(e|ing)\\b[^.]*\\bpods?\\b", "why": "auth runbook: Don't scale up auth-service pods"},
+    {"issue": "PROD-4498", "pattern": "(increase|raise|bump|extend)\\b[^.]*\\b(load[- ]balancer|lb)\\b[^.]*\\btimeout", "why": "auth runbook: Don't increase load balancer timeout"}
+  ],
+  "compliance": {
+    "acme-data-platform": {
+      "data_residency": ["violation"],
+      "audit_rights": ["needs_review", "violation"],
+      "termination": ["compliant"],
+      "liability_cap": ["compliant"],
+      "subprocessors": ["violation"],
+      "breach_notification": ["violation"],
+      "governing_law": ["needs_review", "compliant"]
+    },
+    "globex-messaging": {
+      "data_residency": ["compliant"],
+      "audit_rights": ["compliant"],
+      "termination": ["compliant"],
+      "liability_cap": ["compliant"],
+      "subprocessors": ["compliant"],
+      "breach_notification": ["compliant"],
+      "governing_law": ["compliant"]
+    },
+    "sirius-storage": {
+      "data_residency": ["violation"],
+      "audit_rights": ["violation"],
+      "termination": ["violation"],
+      "liability_cap": ["violation"],
+      "subprocessors": ["violation"],
+      "breach_notification": ["violation"],
+      "governing_law": ["needs_review", "violation"]
+    }
+  }
+}

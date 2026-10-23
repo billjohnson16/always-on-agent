@@ -1,0 +1,24 @@
+{
+  "id": "PROD-4521",
+  "is_incident": true,
+  "severity": "P0",
+  "root_cause": "Deploy regression: payment-service v4.8.2 (guest checkout) introduced the known NPE at PaymentService.java:142 (customer.savedPaymentMethod is null for guest checkout).",
+  "evidence": [
+    "deploys/recent.json: payment-service v4.8.2 deployed_at 2026-05-19T14:04:11Z, files_changed PaymentService.java",
+    "issues/PROD-4521.json: alert opened 14:18, stack trace PaymentService.java:142",
+    "runbooks/payment-service-degraded.md: 'The known NPE bug' at line 142 in the guest checkout flow"
+  ],
+  "runbook": "runbooks/payment-service-degraded.md",
+  "related_deploy": {
+    "service": "payment-service",
+    "version": "v4.8.2",
+    "rollback_to": "v4.8.1"
+  },
+  "linked_issues": [
+    "PROD-4487"
+  ],
+  "recommended_action": "Roll back payment-service to v4.8.1 (rollback available). Alternatively hotfix the null check at line 142 falling back to paymentMethodToken.",
+  "page": "#payments-oncall",
+  "confidence": "high",
+  "needs_human": false
+}

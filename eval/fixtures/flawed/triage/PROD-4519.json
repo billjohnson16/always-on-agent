@@ -1,0 +1,21 @@
+{
+  "id": "PROD-4519",
+  "is_incident": true,
+  "severity": "P2",
+  "root_cause": "Leading suspect: signing-service v2.1.4 reduced the signed-URL TTL; timing is ambiguous (symptoms began before the deploy).",
+  "evidence": [
+    "deploys/recent.json: signing-service v2.1.4 deployed 2026-05-17T11:22:00Z, 'Reduce URL TTL for security review'",
+    "runbooks/cdn-upload-latency.md: signed-URL TTL bug; first check latency by region"
+  ],
+  "runbook": "runbooks/cdn-upload-latency.md",
+  "related_deploy": {
+    "service": "signing-service",
+    "version": "v2.1.4",
+    "rollback_to": "v2.1.3"
+  },
+  "linked_issues": [],
+  "recommended_action": "First compare upload latency by region. If all regions are slow, restore URL_TTL_SECONDS to 3600 or roll back to v2.1.3, coordinating with security.",
+  "page": null,
+  "confidence": "medium",
+  "needs_human": true
+}

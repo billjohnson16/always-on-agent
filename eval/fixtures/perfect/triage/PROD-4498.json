@@ -1,0 +1,18 @@
+{
+  "id": "PROD-4498",
+  "is_incident": true,
+  "severity": "P2",
+  "root_cause": "Connection pool exhaustion on auth-service -> users-db during load spikes (bcrypt holds connections).",
+  "evidence": [
+    "issues/PROD-4498.json: 25-35s 502 windows, no deploys, upstream timeouts",
+    "runbooks/auth-502-windows.md: root cause 95% of the time",
+    "deploys/recent.json: auth-service v6.0.0 deployed 2026-05-14, after the issue opened (05-12) \u2014 ruled out"
+  ],
+  "runbook": "runbooks/auth-502-windows.md",
+  "related_deploy": null,
+  "linked_issues": [],
+  "recommended_action": "Confirm db_pool_idle is 0 during a window, then bump DB_POOL_SIZE from 30 to 60. Don't scale up auth-service pods and don't increase the load balancer timeout. Long term: argon2id (PROD-4221).",
+  "page": null,
+  "confidence": "high",
+  "needs_human": false
+}

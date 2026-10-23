@@ -1,0 +1,16 @@
+{
+  "id": "PROD-4506",
+  "is_incident": false,
+  "severity": null,
+  "root_cause": "Feature request (max_concurrency for WorkerPool), not a production incident.",
+  "evidence": [
+    "issues/PROD-4506.json: proposal for parallel batch jobs"
+  ],
+  "runbook": null,
+  "related_deploy": null,
+  "linked_issues": [],
+  "recommended_action": "Label enhancement and route to the engineering backlog.",
+  "page": "#platform-oncall",
+  "confidence": "high",
+  "needs_human": false
+}
