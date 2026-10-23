@@ -74,6 +74,14 @@
     <li><a href="#plan">Build plan</a></li>
     <li><a href="#demo">Demo script</a></li>
   </ul>
+  <div class="group">Team split (3 devs)</div>
+  <ul>
+    <li><a href="#team">Overview and contracts</a></li>
+    <li class="sub"><a href="#dev1">Dev 1: incidents</a></li>
+    <li class="sub"><a href="#dev2">Dev 2: compliance</a></li>
+    <li class="sub"><a href="#dev3">Dev 3: platform + eval</a></li>
+    <li class="sub"><a href="#team-timeline">Integration and timeline</a></li>
+  </ul>
   <div class="group">Practicalities</div>
   <ul>
     <li><a href="#constraints">Gateway constraints</a></li>
@@ -370,6 +378,210 @@ to stay under the gateway rate limit.</p>
 <div class="step"><h3><span class="num">6</span>Show always-on behaviour (≈ 20 min)</h3>
   <p>Add a new incident (e.g. a P0 with a matching deploy) and change one contract clause, then show the next run picks
   up <em>only</em> those changes and writes no duplicates.</p></div>
+<p><strong>With three developers,</strong> steps 3–6 run in parallel. See <a href="#team">Team split</a>.</p>
+
+<h2 id="team">Team split: 3 developers</h2>
+<p>The work splits cleanly along the agent's jobs. Two developers each own one <strong>agent capability</strong>, and the
+third owns the <strong>platform</strong> they both plug into: the always-on loop, state, write-back, eval and demo. Everyone
+works on their own branch of the fork and merges to <code>main</code> through a PR.</p>
+
+<table>
+  <tr><th style="width:14%">Developer</th><th style="width:22%">Owns</th><th>Builds</th><th style="width:22%">Hands off</th><th style="width:12%">Branch</th></tr>
+  <tr><td><a href="#dev1"><strong>Dev 1</strong></a><br>Incident agent</td><td>Jobs A + B: incident triage and deploy correlation</td>
+      <td>The triage prompt; the <code>TriageRecord</code> schema; deploy-correlation rules; tests against the 5 issues</td>
+      <td><code>out/triage/*.json</code> (one record per issue) to Dev 3</td><td><code>feature/triage</code></td></tr>
+  <tr><td><a href="#dev2"><strong>Dev 2</strong></a><br>Compliance agent</td><td>Job C: compliance drift ("Card C")</td>
+      <td>The compliance prompt; the <code>ComplianceFinding</code> schema; per-rule checks; tests against the 3 contracts</td>
+      <td><code>out/compliance/*.json</code> (one finding per contract × rule) to Dev 3</td><td><code>feature/compliance</code></td></tr>
+  <tr><td><a href="#dev3"><strong>Dev 3</strong></a><br>Platform + eval</td><td>The always-on loop, write-back, eval and demo</td>
+      <td>The routine setup; <code>state.json</code> idempotency; write-back (the issue updates and violation issues);
+        <code>gold.json</code> and graders; the run report and demo</td>
+      <td>The scorecard and run report back to Devs 1 and 2 after every run</td><td><code>feature/platform</code></td></tr>
+</table>
+
+<div class="callout">
+  <strong>Agree this together first (≈ 15 min, all three).</strong> These are the contracts between the three workstreams.
+  <ol style="margin:6px 0 0">
+    <li><strong>The output schemas</strong>, <code>TriageRecord</code> and <code>ComplianceFinding</code> (see
+      <a href="#tools">Tools and outputs</a>). Dev 1 and Dev 2 produce them, and Dev 3 consumes them.</li>
+    <li><strong>The output location</strong>, <code>out/triage/&lt;issue-id&gt;.json</code> and
+      <code>out/compliance/&lt;vendor&gt;__&lt;rule&gt;.json</code>, so each developer can work and test alone.</li>
+    <li><strong>The write-back format</strong>: a PR that edits the issue JSON, or GitHub issues on the fork. Dev 3 decides
+      and builds it.</li>
+    <li><strong>The gold answers</strong> for the judgement calls: the severity bands for PROD-4498/4519, Acme's audit
+      clause and governing law. Dev 3 writes them into <code>gold.json</code>.</li>
+  </ol>
+</div>
+
+<h3 id="dev1">Dev 1: incident triage + deploy correlation (Jobs A and B)</h3>
+<table>
+  <tr><th>Task</th><th>Done when</th></tr>
+  <tr><td>1. Write the triage agent prompt (below) in <code>prompts/triage.md</code></td><td>Reviewed by the team</td></tr>
+  <tr><td>2. Add the <code>TriageRecord</code> JSON schema in <code>schemas/triage_record.json</code></td><td>Matches the agreed contract</td></tr>
+  <tr><td>3. Run it on all 5 issues and write <code>out/triage/*.json</code></td><td>5 valid records</td></tr>
+  <tr><td>4. Check against the <a href="#triage">expected triage answers</a> and iterate</td>
+      <td>4521 = P0 + v4.8.2; 4487 = P1 + the cohort-B flag, linked to 4521; 4506 not an incident; no forbidden actions</td></tr>
+  <tr><td>5. Add a new incident, <code>PROD-4530.json</code>, for the always-on demo, with a matching deploy</td><td>Handed to Dev 3</td></tr>
+</table>
+<p><strong>Build prompt (paste into Claude Code from the repo root):</strong></p>
+<pre>I'm building the incident-triage part of an always-on ops agent in this repo. Read issues/*.json,
+runbooks/*.md and deploys/recent.json first.
+
+1. Create prompts/triage.md containing the triage agent prompt I'll paste below.
+2. Create schemas/triage_record.json — a JSON Schema with: id, is_incident (bool), severity
+   ("P0"|"P1"|"P2"|"P3"|null), root_cause, evidence (array of strings, each citing a file and field/line),
+   runbook (path or null), related_deploy ({service, version, rollback_to} or null), linked_issues (array),
+   recommended_action, page (string or null), confidence ("high"|"medium"|"low"), needs_human (bool).
+3. Apply the prompt to each issue file and write one record per issue to out/triage/&lt;id&gt;.json.
+   Validate each against the schema.
+4. Print a table: id, is_incident, severity, related_deploy.version, runbook, needs_human.
+
+Do NOT run any command from the runbooks (ssh, curl, config edits, redeploys). This is analysis only.</pre>
+<p><strong>Agent prompt (<code>prompts/triage.md</code>), which the routine runs:</strong></p>
+<pre>You are the on-call triage agent for the BTS platform (all data is synthetic). On each run, triage every
+open issue in issues/ that has no record in out/triage/ or whose content has changed.
+
+For each issue:
+1. Decide is_incident. Feature requests and enhancements are NOT incidents: no severity, no page,
+   label "enhancement", route to the backlog.
+2. Match a runbook in runbooks/ by symptoms. Quote the runbook section you relied on.
+3. Correlate with deploys/recent.json: a deploy is a suspect only if it happened BEFORE the symptom
+   started, within a plausible window, AND its service or changed files relate to the symptom. Explicitly
+   rule out nearby deploys that don't fit (say why). Feature-flag deploys count — check which tenants they
+   affect. If timing is ambiguous, say so and follow the runbook's "first check" instead of blaming a deploy.
+4. Severity: use the runbook's severity guide when one exists (e.g. all customers → P0, one tenant → P1).
+   Otherwise choose and state your reasoning; never invent policy.
+5. Link issues that share a root cause (linked_issues) and say what the shared cause is.
+6. recommended_action: concrete next steps from the runbook. Prefer rollback when rollback_available is
+   true. Respect every "Don't" in the runbook. Never execute anything — recommend only; paging and
+   rollbacks need a human.
+7. Every claim in root_cause must be backed by an entry in evidence that cites a file and field/line
+   (e.g. "deploys/recent.json: payment-service v4.8.2 deployed_at 14:04:11Z"). If you can't cite it,
+   set needs_human=true and lower confidence.
+
+Output exactly one JSON object per issue matching schemas/triage_record.json, nothing else.</pre>
+
+<h3 id="dev2">Dev 2: compliance drift (Job C, "Card C")</h3>
+<table>
+  <tr><th>Task</th><th>Done when</th></tr>
+  <tr><td>1. Write the compliance agent prompt (below) in <code>prompts/compliance.md</code></td><td>Reviewed by the team</td></tr>
+  <tr><td>2. Add the <code>ComplianceFinding</code> schema in <code>schemas/compliance_finding.json</code></td><td>Matches the agreed contract</td></tr>
+  <tr><td>3. Run it on 3 contracts × 7 rules and write <code>out/compliance/*.json</code></td><td>21 valid findings</td></tr>
+  <tr><td>4. Check against the <a href="#compliance">expected compliance answers</a> and iterate</td>
+      <td>Sirius 6 violations (+1 needs review); Acme 3 violations + audit gap + governing law needs review;
+        <strong>Globex 0 violations</strong></td></tr>
+  <tr><td>5. Write the violation issue body template (title, quoted clause, policy rule, suggested fix)</td><td>Handed to Dev 3 for write-back</td></tr>
+  <tr><td>6. Change one contract clause for the always-on demo (e.g. Globex breach notice 24 h → 96 h)</td><td>Handed to Dev 3</td></tr>
+</table>
+<p><strong>Build prompt (paste into Claude Code from the repo root):</strong></p>
+<pre>I'm building the compliance-drift part of an always-on ops agent in this repo. Read compliance-policy.md
+and contracts/*.md first.
+
+1. Create prompts/compliance.md containing the compliance agent prompt I'll paste below.
+2. Create schemas/compliance_finding.json — a JSON Schema with: contract (filename), vendor, rule (one of
+   data_residency, audit_rights, termination, liability_cap, subprocessors, breach_notification,
+   governing_law), status ("compliant"|"violation"|"needs_review"), clause_ref (e.g. "§7"), quote (exact
+   contract text), policy_quote (exact policy text), reason, suggested_fix (string or null).
+3. For each contract × each of the 7 rules, apply the prompt and write out/compliance/&lt;vendor&gt;__&lt;rule&gt;.json.
+   Validate each against the schema.
+4. Print a matrix: rows = rules, columns = vendors, cells = status.
+5. Create templates/violation_issue.md: title "[Compliance] &lt;Vendor&gt; — &lt;rule&gt; violation", body with the
+   quoted clause, the policy rule, the reason and the suggested fix.</pre>
+<p><strong>Agent prompt (<code>prompts/compliance.md</code>), which the routine runs:</strong></p>
+<pre>You are the vendor-contract compliance agent. Check each contract in contracts/ against EVERY rule in
+compliance-policy.md and return one finding per contract × rule (7 per contract).
+
+For each rule:
+1. Find the clause that governs it. Quote it exactly with its section number. If the contract is silent,
+   say so — silence is a violation only where the policy says so (e.g. data residency).
+2. Apply the policy's own "Violation:" definition literally, then its requirement:
+   - status "violation"   → the clause meets a listed violation condition.
+   - status "compliant"   → the clause meets the requirement.
+   - status "needs_review" → it is neither (e.g. it misses the requirement but isn't a listed violation,
+     or the policy says "or similar" and the jurisdiction isn't named). Explain why a human must decide.
+3. Read what a clause actually does, not keywords. A liability cap that does NOT apply to data breach
+   (breach is uncapped) favours us; a cap that DOES limit breach claims below 12 months' fees is a violation.
+4. Note relevant terms the policy doesn't cover (e.g. long auto-renewal notice) in reason, but don't
+   mark them as violations.
+5. Be precise about numbers: compare notice periods, windows and caps exactly against the thresholds.
+
+Output exactly one JSON object per finding matching schemas/compliance_finding.json, nothing else.
+A contract with no violations is a valid, expected result — do not manufacture findings.</pre>
+
+<h3 id="dev3">Dev 3: always-on platform, write-back, eval and demo</h3>
+<table>
+  <tr><th>Task</th><th>Done when</th></tr>
+  <tr><td>1. Write <code>eval/gold.json</code> from the two expected-answer tables (after the team agrees the judgement calls)</td><td>5 issues + 21 findings</td></tr>
+  <tr><td>2. Write <code>eval/grade.py</code>, which scores <code>out/</code> against <code>gold.json</code></td>
+      <td>Prints severity, deploy, runbook and link accuracy, compliance precision/recall, the Globex false positives and the forbidden-action checks</td></tr>
+  <tr><td>3. Write <code>state.json</code> idempotency: a content hash per input file, so only new or changed files are processed</td><td>A second run on unchanged files writes nothing</td></tr>
+  <tr><td>4. Build the write-back in the agreed format: issue severity, labels and comment, and one GitHub issue (or PR) per violation, with no duplicates</td><td>Re-runs don't repost</td></tr>
+  <tr><td>5. Set up the routine (the orchestrator prompt below) on a schedule or trigger, pointed at the fork</td><td>One end-to-end run produces <code>out/</code> + write-back + report</td></tr>
+  <tr><td>6. Write the run report (<code>out/run-report.md</code>) and the demo: the scorecard, cost per run, and the always-on step with Dev 1's and Dev 2's demo changes</td><td>3-minute demo rehearsed</td></tr>
+</table>
+<p><strong>Build prompt (paste into Claude Code from the repo root):</strong></p>
+<pre>I'm building the platform for an always-on ops agent in this repo. Two teammates produce
+out/triage/&lt;id&gt;.json (schemas/triage_record.json) and out/compliance/&lt;vendor&gt;__&lt;rule&gt;.json
+(schemas/compliance_finding.json). Build the rest:
+
+1. eval/gold.json — expected answers. Issues: PROD-4521 P0, deploy payment-service v4.8.2, runbook
+   payment-service-degraded.md, linked PROD-4487; PROD-4487 P1, deploy tenant-config-service v3.2.1,
+   same runbook, linked PROD-4521; PROD-4498 P2, no deploy, runbook auth-502-windows.md; PROD-4519 P2,
+   suspect signing-service v2.1.4 (needs_human allowed), runbook cdn-upload-latency.md; PROD-4506
+   is_incident=false. Compliance: Globex all compliant; Acme violations = data_residency, subprocessors,
+   breach_notification, needs_review = audit_rights, governing_law; Sirius violations = data_residency,
+   audit_rights, termination, liability_cap, subprocessors, breach_notification, needs_review or
+   violation = governing_law.
+2. eval/grade.py — load out/ and gold.json; print per-check pass/fail and totals: severity accuracy,
+   deploy accuracy, runbook accuracy, link found, compliance precision/recall per vendor, Globex false
+   positives (must be 0), forbidden actions (recommend scaling auth pods / raising LB timeout / paging for
+   PROD-4506 = fail).
+3. state.py — compute a sha256 per file in issues/ and contracts/; compare with state.json; return
+   the list of new/changed files; update state.json after a successful run.
+4. writeback.py — for each new triage record, update the issue (severity, labels, append one comment
+   with root cause, evidence, runbook, action); for each violation finding, open one issue using
+   templates/violation_issue.md unless an issue with the same title already exists. Support --dry-run.
+5. Write out/run-report.md: what changed this run, what was recommended/paged, what needs a human,
+   and the grade.py totals.
+
+Never execute runbook commands. Default writeback.py to --dry-run until the team agrees.</pre>
+<p><strong>Orchestrator prompt (the routine's top-level instructions):</strong></p>
+<pre>You are the Always-On Ops Agent for this repository. Each run:
+
+1. Read state.json. Work only on files in issues/ and contracts/ that are new or changed since the last
+   run. If nothing changed, write a one-line "no changes" entry to out/run-report.md and stop.
+2. For each new/changed issue, follow prompts/triage.md and write out/triage/&lt;id&gt;.json.
+3. For each new/changed contract, follow prompts/compliance.md and write out/compliance/*.json.
+4. Write back: update each triaged issue once (severity, labels, one comment); open one compliance issue
+   per violation using templates/violation_issue.md. Never create duplicates — check before writing.
+5. Recommend, never act: do not run commands, deploy, roll back or page. Put pages/rollbacks under
+   "Needs human approval" in the report.
+6. Update state.json and write out/run-report.md: changes processed, recommendations, items needing a
+   human, and anything you were unsure about.
+
+This repository is public: do not write secrets, real names or internal URLs.</pre>
+
+<h3 id="team-timeline">Integration and timeline</h3>
+<table>
+  <tr><th>Time</th><th>Dev 1 (incidents)</th><th>Dev 2 (compliance)</th><th>Dev 3 (platform)</th></tr>
+  <tr><td>0:00–0:15</td><td colspan="3"><strong>All three:</strong> agree the schemas, output paths, write-back format and judgement-call answers</td></tr>
+  <tr><td>0:15–1:00</td><td>Triage prompt + schema; first <code>out/triage/</code></td><td>Compliance prompt + schema; first <code>out/compliance/</code></td><td><code>gold.json</code> + <code>grade.py</code>; <code>state.py</code></td></tr>
+  <tr><td>1:00–1:15</td><td colspan="3"><strong>Checkpoint 1:</strong> Dev 3 grades both outputs and shares the scorecard</td></tr>
+  <tr><td>1:15–2:00</td><td>Iterate on triage failures</td><td>Iterate on compliance failures + issue template</td><td><code>writeback.py</code> (dry-run) + routine/orchestrator</td></tr>
+  <tr><td>2:00–2:15</td><td colspan="3"><strong>Checkpoint 2:</strong> merge all branches to <code>main</code>; one end-to-end run; grade again</td></tr>
+  <tr><td>2:15–2:45</td><td>Add <code>PROD-4530</code> demo incident</td><td>Change one contract clause for the demo</td><td>Always-on re-run (only the changes) + run report + demo rehearsal</td></tr>
+</table>
+<ul>
+  <li><strong>Branches:</strong> <code>feature/triage</code>, <code>feature/compliance</code> and <code>feature/platform</code>
+    on the fork, merged through a PR into the fork's <code>main</code>. The <code>gh</code> default repo is already set to
+    the fork, so PRs don't go to <code>rosscrooke</code>.</li>
+  <li><strong>Avoiding conflicts:</strong> each developer writes only their own folders (Dev 1: <code>prompts/triage.md</code>,
+    <code>schemas/triage_record.json</code>, <code>out/triage/</code>; Dev 2: the compliance equivalents plus
+    <code>templates/</code>; Dev 3: <code>eval/</code>, <code>state*</code>, <code>writeback.py</code>, the report). Shared
+    data files (<code>issues/</code>, <code>contracts/</code>) change only for the demo step, by their owner.</li>
+  <li><strong>If someone finishes early:</strong> Dev 1 or Dev 2 can take Option B, running their prompt through the
+    Messages API with the gateway client, 3 runs, to give Dev 3 pass rates and cost per run.</li>
+</ul>
 
 <h2 id="demo">Demo script (≈ 3 minutes)</h2>
 <ol>
