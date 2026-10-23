@@ -1,0 +1,11 @@
+{
+  "contract": "contracts/globex-messaging.md",
+  "vendor": "Globex Messaging Inc.",
+  "rule": "subprocessors",
+  "status": "compliant",
+  "clause_ref": "\u00a7",
+  "quote": "(fixture)",
+  "policy_quote": "(fixture)",
+  "reason": "(fixture finding for grader tests)",
+  "suggested_fix": null
+}

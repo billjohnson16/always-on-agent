@@ -1,0 +1,11 @@
+{
+  "contract": "contracts/acme-data-platform.md",
+  "vendor": "Acme Data Platform Ltd.",
+  "rule": "subprocessors",
+  "status": "violation",
+  "clause_ref": "\u00a7",
+  "quote": "(fixture)",
+  "policy_quote": "(fixture)",
+  "reason": "(fixture finding for grader tests)",
+  "suggested_fix": null
+}

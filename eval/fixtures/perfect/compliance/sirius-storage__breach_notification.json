@@ -1,0 +1,11 @@
+{
+  "contract": "contracts/sirius-storage.md",
+  "vendor": "Sirius Storage SDN BHD",
+  "rule": "breach_notification",
+  "status": "violation",
+  "clause_ref": "\u00a7",
+  "quote": "(fixture)",
+  "policy_quote": "(fixture)",
+  "reason": "(fixture finding for grader tests)",
+  "suggested_fix": null
+}
